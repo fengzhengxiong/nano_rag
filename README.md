@@ -65,8 +65,8 @@ pip install -r requirements.txt
 
 ### 2️⃣ 模型准备
 下载以下模型并放入 `models/` 目录：
-- Embedding: `BAAI/bge-large-zh-v1.5`
-- Reranker: `BAAI/bge-reranker-base`
+*   🧬 **Embedding**: [BAAI/bge-large-zh-v1.5](https://huggingface.co/BAAI/bge-large-zh-v1.5)
+*   ⚖️ **Rerank**: [BAAI/bge-reranker-base](https://huggingface.co/BAAI/bge-reranker-base)
 
 ### 3️⃣ 配置文件
 修改 `configs/default_config.yaml`，填入你的 `api_key` (支持 SiliconFlow/DeepSeek/OpenAI)。
@@ -77,15 +77,7 @@ pip install -r requirements.txt
 
 为了完整体验本项目的强大能力，请按以下顺序操作：
 
-### 🟢 第一步：生成高难度测试数据
-我们提供了一个脚本，生成包含**复杂跨行表格**的财务报表 PDF，用于测试 Docling 的解析能力。
-
-```bash
-python generate_pdf.py
-# 输出: data/financial_report_2024.pdf
-```
-
-### 🟢 第二步：构建知识库 (Ingest)
+### 🟢 第一步：构建知识库 (Ingest)
 将 PDF 解析并向量化。这一步会自动调用 Docling 视觉模型。
 
 ```bash
@@ -93,7 +85,7 @@ python -m src.nano_rag.cli ingest --force-rebuild
 # 观察日志，确认看到 'Successfully parsed ...' 字样
 ```
 
-### 🟢 第三步：启动服务 (需开启两个终端)
+### 🟢 第二步：启动服务 (需开启两个终端)
 
 **Terminal A: 启动后端 API (Engine)**
 ```bash
@@ -107,7 +99,7 @@ streamlit run web_app.py
 # 浏览器会自动打开 http://localhost:8501
 ```
 
-### 🟢 第四步：体验问答
+### 🟢 第三步：体验问答
 在网页中尝试提问（测试表格理解能力）：
 > *“2024年 Q4 的企业级 RAG 一体机营收是多少？”*
 
