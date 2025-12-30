@@ -6,6 +6,16 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
+# 可观测性配置 (LangSmith)
+# ------------------------------------------------------------------------------
+observability:
+  enabled: true
+  provider: "langsmith"
+  # 把你在第一步申请的 Key 填在这里
+  api_key: "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"
+  project_name: "nano_rag"
+
+# ------------------------------------------------------------------------------
 # 全局基础配置
 # ------------------------------------------------------------------------------
 logging:
@@ -113,14 +123,25 @@ retrieval_strategy:
 
       # 配置 Reranker
       reranker:
-        active: "bge_base"
+        active: "local_rerank"
         profiles:
-          bge_base:
+          local_rerank:
             type: "bge_reranker"
-            # 使用 BAAI 的 reranker 模型，效果很好
-            model_name: "models/bge-reranker-base" 
-            use_fp16: true
-            top_k: 5  # 精排后只取前 5 个给大模型
+            model_name: "models/bge-reranker-base-onnx" # models/bge-reranker-base, models/bge-reranker-base-onnx
+            backend: "onnx"  # pytorch, onnx
+            use_fp16: false
+            top_k: 5
+
+#      reranker:
+#        active: "bge_base"
+#        profiles:
+#          bge_base:
+#            type: "bge_reranker"
+#            # 使用 BAAI 的 reranker 模型，效果很好
+#            model_name: "models/bge-reranker-base"
+#            use_fp16: true
+#            top_k: 5  # 精排后只取前 5 个给大模型
+
 
 # ------------------------------------------------------------------------------
 # LLM (大语言模型) / 生成器 (由本地 Ollama 提供)
