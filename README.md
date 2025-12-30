@@ -27,18 +27,18 @@ graph TD
     subgraph "Service Layer (Async)"
     Gateway -->|Dispatch| QueryService
     Gateway -->|Background| IngestService
-    QueryService <-->|Read/Write| Cache[Semantic Cache (FAISS)]
-    QueryService <-->|Persist| DB[(SQLite History)]
+    QueryService <-->|Read/Write| Cache["Semantic Cache (FAISS)"]
+    QueryService <-->|Persist| DB[("SQLite History")]
     end
 
     subgraph "Core Engine (Local)"
-    IngestService -->|Visual Parse| Docling[Docling ETL]
-    QueryService -->|Hybrid Search| Retriever[BM25 + Vector]
-    Retriever -->|Re-rank| Reranker[BGE ONNX/PyTorch]
+    IngestService -->|Visual Parse| Docling["Docling ETL"]
+    QueryService -->|Hybrid Search| Retriever["Retrieval (BM25 + Vector)"]
+    Retriever -->|Re-rank| Reranker["Reranker (BGE ONNX/PyTorch)"]
     end
 
     subgraph "Inference (Cloud)"
-    QueryService -->|Context| LLM[DeepSeek V3 / OpenAI]
+    QueryService -->|Context| LLM["DeepSeek V3 / OpenAI"]
     end
 ```
 
