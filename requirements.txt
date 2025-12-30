@@ -1,0 +1,41 @@
+# ==========================================
+# RAG-FZX Project Dependencies
+# Generated for Python 3.11 (Recommended)
+# ==========================================
+
+# --- 1. RAG Framework (LangChain Ecosystem) ---
+# 锁定在 0.3.x 体系，确保稳定性
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-openai>=0.2.0        # 用于连接 DeepSeek/SiliconFlow
+langchain-huggingface>=0.1.0   # 用于 BGE Embedding
+
+# --- 2. Retrieval & Vector Store ---
+faiss-cpu>=1.8.0               # 向量数据库
+sentence-transformers>=3.1.0   # 必须 >=3.0 以适配新版 BGE
+rank_bm25>=0.2.2               # 混合检索算法
+
+# --- 3. Web API & Frontend ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+streamlit>=1.35.0
+httpx>=0.27.0                  # 异步 HTTP 请求库
+requests>=2.31.0
+
+# --- 4. Deep Document Parsing (ETL) ---
+docling>=2.0.0                 # IBM 深度文档解析 (PDF/Table)
+chardet>=5.2.0                 # 编码检测辅助
+
+# --- 5. Evaluation & Testing ---
+ragas>=0.2.0                   # RAG 评估框架
+datasets>=2.19.0
+pandas>=2.2.0
+openpyxl>=3.1.0                # Excel 导出依赖
+reportlab>=4.2.0               # 用于生成测试 PDF 数据
+
+# --- 6. Utilities ---
+pydantic>=2.9.0
+pyyaml>=6.0
+tiktoken>=0.7.0
