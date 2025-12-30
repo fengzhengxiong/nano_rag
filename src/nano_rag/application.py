@@ -9,6 +9,7 @@
 '''
 
 import logging
+import os
 
 from .config.models import ResolvedConfig
 from .core.exceptions import InitializationError
@@ -16,6 +17,10 @@ from .factories import ComponentFactory
 from .retrievers.factory import RetrieverFactory
 from .services.ingestion_service import IngestionService
 from .services.query_service import QueryService
+from .services.cache_service import SemanticCacheService
+
+from .config.loader import load_app_config
+from .config.prompt_loader import load_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +38,10 @@ class RAGApplication:
         self.config = config
         self.ingestion_service: IngestionService | None = None
         self.query_service: QueryService | None = None
+        self.cache_service : SemanticCacheService | None = None
+
+        # 【核心修改】在初始化组件之前，先设置可观测性
+        self._setup_observability()
 
         logger.info("Initializing RAGApplication...")
         try:
@@ -42,6 +51,39 @@ class RAGApplication:
             # 捕获在组装过程中的任何异常，并将其包装为 InitializationError
             logger.critical(f"Application failed to initialize: {e}", exc_info=True)
             raise InitializationError("RAGApplication", "Fatal error during application startup.", e) from e
+
+    def _setup_observability(self):
+        """
+        根据配置自动开启 LangSmith 追踪。
+        注意：这里我们需要重新加载一下原始 AppConfig 来获取 observability 字段，
+        或者你也可以修改 resolve_active_configs 把它透传给 ResolvedConfig。
+        为了简单，我们直接在这里读一次原始配置的对应部分。
+        """
+        try:
+            # 这里的逻辑稍微有点 tricky，因为 config 已经是 ResolvedConfig 了
+            # 我们假设你在 ResolvedConfig 里没加 observability
+            # 所以我们可以重新读一下，或者更简单的：
+            # 建议你在上一步把 observability 也加到 ResolvedConfig 里
+            # 如果没加，我们可以通过 load_app_config() 拿
+
+            raw_config = load_app_config()  # 这会读取 default_config.yaml
+            obs_config = raw_config.observability
+
+            if obs_config and obs_config.enabled:
+                logger.info(f"🔭 Enabling LangSmith Tracing (Project: {obs_config.project_name})")
+
+                # 设置 LangChain 官方要求的环境变量
+                os.environ["LANGCHAIN_TRACING_V2"] = "true"
+                os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+                os.environ["LANGCHAIN_PROJECT"] = obs_config.project_name
+
+                if obs_config.api_key:
+                    os.environ["LANGCHAIN_API_KEY"] = obs_config.api_key
+            else:
+                logger.info("🔭 Observability is disabled.")
+
+        except Exception as e:
+            logger.warning(f"Failed to setup observability: {e}")
 
     def _initialize_and_assemble(self):
         """
@@ -63,6 +105,15 @@ class RAGApplication:
         embedding_model = ComponentFactory.create_embedding_model(
             config=self.config.embedding
         )
+
+        self.cache_service = SemanticCacheService(
+            embedding_model=embedding_model,
+            persist_dir=self.config.resolved_paths.persist_dir
+        )
+
+        # 【新增】加载 Prompt 配置
+        prompt_config = load_prompts()
+        logger.info("Loaded external prompt configuration.")
 
         llm = ComponentFactory.create_llm(
             config=self.config.llm
@@ -121,7 +172,9 @@ class RAGApplication:
             self.query_service = QueryService(
                 llm=llm,
                 retriever=retriever,
-                reranker=reranker
+                reranker=reranker,
+                cache_service=self.cache_service,
+                prompt_config=prompt_config  # 【新增】注入
             )
         else:
             self.query_service = None
