@@ -1,0 +1,5 @@
+id,question,answer
+1,"什么是FAISS？","FAISS (Facebook AI Similarity Search) 是一个由Facebook AI Research开发的库，专门用于高效的相似性搜索和海量向量的聚类。"
+2,"FAISS的主要特点是什么？","FAISS的主要特点是速度快和内存效率高。它提供了多种索引方法，可以在数十亿级别的向量数据上进行毫秒级的搜索。"
+3,"FAISS支持哪些索引类型？","FAISS支持多种索引，包括精确索引如IndexFlatL2，以及近似最近邻（ANN）索引如IndexIVFFlat、IndexHNSWFlat等，以在速度和精度之间做权衡。"
+4.1,"如何安装FAISS？","你可以通过conda或pip来安装FAISS。例如，使用pip安装CPU版本：'pip install faiss-cpu'；安装GPU版本则为：'pip install faiss-gpu'。"
