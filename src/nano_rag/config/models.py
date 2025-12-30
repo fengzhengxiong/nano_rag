@@ -99,11 +99,18 @@ class RecursiveCharacterTextSplitterConfig(BaseModel):
     keep_separator: bool
     separators: List[str]
 
+
 class BGERerankerConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     type: Literal["bge_reranker"]
     model_name: str
+
+    # 【新增】推理后端开关
+    # pytorch: 原有模式 (慢，稳)
+    # onnx: 新模式 (快，需要转换后的模型)
+    backend: Literal["pytorch", "onnx"] = "pytorch"
+
     use_fp16: bool
     top_k: int = Field(gt=0)
 
@@ -140,6 +147,13 @@ class CacheConfig(BaseModel):
     enable: bool
     type: Optional[Literal["sqlite", "memory"]] = None
 
+# 【新增】可观测性配置模型
+class ObservabilityConfig(BaseModel):
+    enabled: bool = False
+    provider: Literal["langsmith"] = "langsmith"
+    api_key: Optional[str] = None
+    project_name: str = "nano_rag"
+
 # ==============================================================================
 # PART 3: 完整的原始应用配置模型 (AppConfig)
 # ==============================================================================
@@ -147,6 +161,7 @@ class AppConfig(BaseModel):
     """映射整个 YAML 文件的结构"""
     logging: LoggingConfig
     paths: PathsConfig
+    observability: Optional[ObservabilityConfig] = None
     data_source: ProfileSet[DirectoryLoaderConfig]
     text_splitter: ProfileSet[RecursiveCharacterTextSplitterConfig]
 
