@@ -1,0 +1,154 @@
+# ==============================================================================
+# RAG-FZX 系统核心配置文件 (重构版 V1.0)
+#
+# 设计哲学: "万物皆 Profile"。系统的每一个可插拔模块都由 "active" 和
+# "profiles" 驱动，使得切换或添加新功能无需修改任何 Python 代码。
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 全局基础配置
+# ------------------------------------------------------------------------------
+logging:
+  log_dir: "${LOG_DIR:logs}"         # 日志文件存放目录
+  log_level: "INFO"                 # 日志级别 (DEBUG, INFO, WARNING, ERROR)
+  max_bytes: 10485760               # 每个日志文件最大 10MB
+  backup_count: 5                   # 保留最近 5 个日志文件
+
+paths:
+  data_dir: "${DATA_DIR:data}"      # 知识库源文件目录
+  cache_db_file: ".rag_cache.db"    # 缓存数据库文件名 (未使用，为未来预留)
+  persist_base_dir: "storage"       # 所有持久化数据 (向量库, BM25索引) 的根目录
+
+# ==============================================================================
+# 可插拔的功能模块 (全部采用 Profile 架构)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 数据源 (Data Source) / 文档加载器
+# ------------------------------------------------------------------------------
+data_source:
+  active: "local_files_multi_format"
+  profiles:
+    local_files_multi_format:
+      type: "directory_loader"
+      glob_pattern: "**/*"               # 匹配所有子目录下的所有文件
+      use_multreading: true
+      silent_errors: false
+      on_unsupported_type: "warn"       # 对不支持的文件类型发出警告，而不是报错
+      text_loader_autodetect_encoding: true
+      loader_mapping:
+        ".txt": "langchain_community.document_loaders.TextLoader"
+        ".md": "langchain_community.document_loaders.TextLoader"
+        ".pdf": "langchain_community.document_loaders.PyMuPDFLoader"
+        ".docx": "langchain_community.document_loaders.UnstructuredWordDocumentLoader"
+        ".csv": "langchain_community.document_loaders.CSVLoader"
+
+# ------------------------------------------------------------------------------
+# 文本分割器 (Text Splitter)
+# ------------------------------------------------------------------------------
+text_splitter:
+  active: "recursive_chinese_optimized"
+  profiles:
+    recursive_chinese_optimized:
+      type: "recursive_character"
+      chunk_size: 400
+      chunk_overlap: 40
+      keep_separator: true
+      separators: ["\n\n", "\n", "。", "！", "？", "，", "、", " "]
+
+# ------------------------------------------------------------------------------
+# Embedding 模型 (由本地 Ollama 提供)
+# ------------------------------------------------------------------------------
+embedding:
+  active: "local_bge_large"
+  profiles:
+    # 旧的 Ollama 配置 (保留备用)
+    ollama_bge:
+      type: "ollama_embedding"
+      base_url: "http://localhost:11434"
+      model_name: "dentonzst/text2vec-base-chinese:latest"
+
+    # 【新增】本地 BGE 模型配置
+    local_bge_large:
+      type: "huggingface"
+      # 请确保该文件夹里有 config.json, pytorch_model.bin 等文件
+      model_name: "models/bge-large-zh-v1.5"
+      device: "cpu"
+
+# ------------------------------------------------------------------------------
+# 向量存储 (Vector Store)
+# ------------------------------------------------------------------------------
+vector_store:
+  active: "faiss_local"
+  profiles:
+    faiss_local:
+      type: "faiss"
+      allow_dangerous_deserialization: true
+
+# ------------------------------------------------------------------------------
+# 检索策略 (Retrieval Strategy)
+# 【重要】我们在这里激活了没有 Reranker 的策略
+# ------------------------------------------------------------------------------
+retrieval_strategy:
+  # 【修改点 1】激活带 Reranker 的策略
+  active: "hybrid_with_reranker"
+  profiles:
+    # 策略一：无 Reranker (旧的)
+    hybrid_no_reranker:
+      retriever:
+        strategy: "hybrid"
+        bm25_config: { k1: 1.5, b: 0.75, top_k: 10 }
+        vector_config: { search_type: "similarity", top_k: 10 }
+        hybrid_config: { bm25_weight: 0.5, vector_weight: 0.5, top_k: 10 }
+      reranker: null
+
+    # 【修改点 2】新增策略：带 Reranker (推荐用于生产环境)
+    hybrid_with_reranker:
+      retriever:
+        strategy: "hybrid"
+        # 粗排召回更多文档 (例如 Top 50)
+        bm25_config: { k1: 1.5, b: 0.75, top_k: 50 }
+        vector_config: { search_type: "similarity", top_k: 50 }
+        hybrid_config: { bm25_weight: 0.5, vector_weight: 0.5, top_k: 50 }
+
+      # 配置 Reranker
+      reranker:
+        active: "bge_base"
+        profiles:
+          bge_base:
+            type: "bge_reranker"
+            # 使用 BAAI 的 reranker 模型，效果很好
+            model_name: "models/bge-reranker-base" 
+            use_fp16: true
+            top_k: 5  # 精排后只取前 5 个给大模型
+
+# ------------------------------------------------------------------------------
+# LLM (大语言模型) / 生成器 (由本地 Ollama 提供)
+# ------------------------------------------------------------------------------
+llm:
+  active: "siliconflow_deepseek"
+  profiles:
+    # 旧的 Ollama 配置
+    ollama_qwen:
+      type: "ollama"
+      base_url: "http://localhost:11434"
+      model_name: "qwen2:7b"
+      num_ctx: 4096
+
+    # 【新增】硅基流动 API 配置
+    siliconflow_deepseek:
+      type: "openai"
+      base_url: "https://api.siliconflow.cn/v1"
+      api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      model_name: "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B" # 或者 DeepSeek-R1
+      temperature: 0.3
+      max_tokens: 4096
+
+# ------------------------------------------------------------------------------
+# 缓存 (Cache) - (当前未使用，为未来预留)
+# ------------------------------------------------------------------------------
+cache:
+  active: "disabled"
+  profiles:
+    disabled: { enable: false }
+    in_memory: { enable: true, type: "memory" }
