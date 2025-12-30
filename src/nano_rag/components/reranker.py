@@ -14,6 +14,7 @@ import torch
 import asyncio
 from typing import List, Tuple
 from langchain_core.documents import Document
+from langsmith import traceable
 from sentence_transformers import CrossEncoder
 
 from ..core.interfaces import RerankerInterface
@@ -70,6 +71,7 @@ class BGEReranker(RerankerInterface):
     def config(self) -> BGERerankerConfig:
         return self._config
 
+    @traceable(name="BGE Reranker", run_type="retriever")  # 【新增这行】
     def rerank(self, query: str, documents: List[Document]) -> List[Tuple[Document, float]]:
         """同步重排序"""
         if not documents:
