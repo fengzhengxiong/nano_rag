@@ -1,0 +1,7 @@
+Transformer模型是深度学习领域的一项革命性创新，由Google在2017年的论文《Attention Is All You Need》中首次提出。它最初被设计用于机器翻译任务，但其核心机制，特别是自注意力（Self-Attention）机制，使其在各种序列到序列（Seq2Seq）的任务中都表现出色。
+
+与循环神经网络（RNN）或长短期记忆网络（LSTM）不同，Transformer完全抛弃了递归结构。RNN和LSTM通过顺序处理输入序列来捕捉依赖关系，这使得它们难以并行化，并且在处理长序列时会遇到梯度消失或爆炸的问题。Transformer通过自注意力机制，能够直接计算序列中任意两个位置之间的依赖关系，无论它们相距多远。这不仅极大地提高了模型的并行计算能力，也解决了长距离依赖的难题。
+
+一个标准的Transformer模型由编码器（Encoder）和解码器（Decoder）两部分组成。编码器负责将输入序列（例如，源语言句子）转换成一组连续的表示（向量），而解码器则利用这些表示，逐个生成输出序列（例如，目标语言句子）。编码器和解码器都由多个相同的层堆叠而成，每一层都包含一个多头自注意力（Multi-Head Self-Attention）子层和一个前馈神经网络（Feed-Forward Network）子层。
+
+Transformer的成功催生了一系列著名的预训练模型，如BERT（Bidirectional Encoder Representations from Transformers）和GPT（Generative Pre-trained Transformer）。BERT主要使用编码器结构，擅长理解任务；而GPT系列主要使用解码器结构，在文本生成方面表现卓越。
