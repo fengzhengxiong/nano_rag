@@ -14,6 +14,7 @@ from typing import Union
 
 from .core.exceptions import ConfigurationError
 from .components.reranker import BGEReranker
+from .components.reranker_onnx import ONNXBGEReranker
 from .components.embedding import OllamaEmbedding, HuggingFaceEmbedding
 from .components.document_loader import DirectoryLoader
 from .components.text_splitter import RecursiveCharacterTextSplitter
@@ -93,10 +94,24 @@ class ComponentFactory:
 
         raise ConfigurationError(f"Unsupported LLM type: {config.type}")
 
+    # @staticmethod
+    # def create_reranker(config: BGERerankerConfig) -> RerankerInterface:
+    #     """创建重排序器。"""
+    #     logger.info(f"Creating Reranker of type: {config.type}")
+    #     if config.type == "bge_reranker":
+    #         return BGEReranker(config)
+    #     raise ConfigurationError(f"Unsupported reranker type: {config.type}")
+
     @staticmethod
     def create_reranker(config: BGERerankerConfig) -> RerankerInterface:
-        """创建重排序器。"""
-        logger.info(f"Creating Reranker of type: {config.type}")
+        """创建重排序器 (支持 PyTorch 和 ONNX 双后端)。"""
+        logger.info(f"Creating Reranker of type: {config.type}, Backend: {config.backend}")
+
         if config.type == "bge_reranker":
-            return BGEReranker(config)
+            # 【核心逻辑】根据后端配置选择实现类
+            if config.backend == "onnx":
+                return ONNXBGEReranker(config)
+            else:
+                return BGEReranker(config)
+
         raise ConfigurationError(f"Unsupported reranker type: {config.type}")
