@@ -3,39 +3,46 @@
 # Generated for Python 3.11 (Recommended)
 # ==========================================
 
-# --- 1. RAG Framework (LangChain Ecosystem) ---
-# 锁定在 0.3.x 体系，确保稳定性
+# --- 1. RAG Core & Framework ---
 langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-community>=0.3.0
 langchain-text-splitters>=0.3.0
-langchain-openai>=0.2.0        # 用于连接 DeepSeek/SiliconFlow
-langchain-huggingface>=0.1.0   # 用于 BGE Embedding
+langchain-openai>=0.2.0        # LLM Connector
+langchain-huggingface>=0.1.0   # Embedding Connector
 
-# --- 2. Retrieval & Vector Store ---
-faiss-cpu>=1.8.0               # 向量数据库
-sentence-transformers>=3.1.0   # 必须 >=3.0 以适配新版 BGE
-rank_bm25>=0.2.2               # 混合检索算法
+# --- 2. Vector Store & Retrieval ---
+faiss-cpu>=1.8.0               # Vector Database
+sentence-transformers>=3.1.0   # Embedding Model
+rank_bm25>=0.2.2               # Keyword Search
 
-# --- 3. Web API & Frontend ---
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
-streamlit>=1.35.0
-httpx>=0.27.0                  # 异步 HTTP 请求库
+# --- 3. Web API & UI (V1.2/V1.3) ---
+fastapi>=0.110.0               # Backend API
+uvicorn[standard]>=0.29.0      # ASGI Server
+streamlit>=1.35.0              # Frontend UI
+httpx>=0.27.0                  # Async HTTP Client
 requests>=2.31.0
 
-# --- 4. Deep Document Parsing (ETL) ---
-docling>=2.0.0                 # IBM 深度文档解析 (PDF/Table)
-chardet>=5.2.0                 # 编码检测辅助
+# --- 4. Data Processing (ETL) ---
+docling>=2.0.0                 # Deep PDF/Table Parsing
+chardet>=5.2.0                 # Encoding Detection
 
-# --- 5. Evaluation & Testing ---
-ragas>=0.2.0                   # RAG 评估框架
+# --- 5. Persistence & Database ---
+sqlmodel>=0.0.16               # ORM (based on Pydantic/SQLAlchemy)
+aiosqlite>=0.20.0              # Async SQLite Driver
+
+# --- 6. Optimization (ONNX) ---
+optimum[onnxruntime]>=1.17.0   # Model Quantization & Inference
+onnxruntime>=1.17.0
+
+# --- 7. Evaluation & Testing ---
+ragas>=0.2.0                   # RAG Evaluation Framework
 datasets>=2.19.0
 pandas>=2.2.0
-openpyxl>=3.1.0                # Excel 导出依赖
-reportlab>=4.2.0               # 用于生成测试 PDF 数据
+openpyxl>=3.1.0
+reportlab>=4.2.0               # Test Data Generation
 
-# --- 6. Utilities ---
+# --- 8. Infrastructure ---
 pydantic>=2.9.0
 pyyaml>=6.0
 tiktoken>=0.7.0
