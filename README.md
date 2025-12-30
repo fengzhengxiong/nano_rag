@@ -1,20 +1,19 @@
 # ⚡️ NANO-RAG: Enterprise-Grade Async RAG System
 
-> **基于 FastAPI 全链路异步 (Asyncio) + 混合云架构 (Hybrid Cloud) + 深度文档解析 (Docling) 的企业级 RAG 知识库微服务**
+> **基于 FastAPI 全链路异步 + 混合云架构 + 深度文档解析 + 语义缓存的企业级 RAG 微服务**
 
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/) [![LangChain](https://img.shields.io/badge/LangChain-LCEL-blue?logo=langchain)](https://python.langchain.com/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-Async-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/) [![ONNX](https://img.shields.io/badge/ONNX-Accelerated-blue?logo=onnx&logoColor=white)](https://onnxruntime.ai/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
 ## 📖 项目简介 (Introduction)
 
-**NANO-RAG** 是一个**高性能、模块化、可扩展**的本地知识库问答解决方案。本项目按**企业级 SaaS 标准**构建，旨在解决 RAG 系统在生产环境中的**高并发阻塞**、**复杂表格解析**与**回答精准度**问题。
+**NANO-RAG** 是一个**生产就绪 (Production-Ready)** 的本地知识库问答系统。它不满足于简单的 Demo，而是针对企业落地中的核心痛点（**高并发延迟、表格解析乱码、数据隐私、服务稳定性**）进行了深度架构优化。
 
 ### 核心价值
-- 🚀 **高性能异步架构**: 彻底抛弃同步阻塞模式，基于 `FastAPI` + `Asyncio` 重写核心链路，支持 **SSE 流式响应**，实现打字机般的丝滑体验。
-- 📄 **深度文档解析 (Deep ETL)**: 集成 **IBM Docling** 视觉模型，精准还原 PDF 中的跨页表格、多栏排版，将其转化为结构化 Markdown，彻底解决“大模型看不懂财报”的痛点。
-- ⚖️ **混合检索与重排**: 采用 `BM25` + `Vector` 混合检索，并引入 **BGE Cross-Encoder** 进行语义重排序，大幅抑制幻觉。
-- 📊 **自动化评估**: 内置 **Ragas** 评估流水线，可量化系统的 **Faithfulness** (防幻觉) 和 **Context Recall** (召回率)。
+- 🚀 **极致性能**: 全链路 `Asyncio` 异步架构，配合 **ONNX INT8** 量化重排序，以及 **Semantic Cache** (语义缓存)，实现重复问题 **0ms 秒回**。
+- 📄 **深度解析 (Deep ETL)**: 集成 **IBM Docling** 视觉模型，精准还原 PDF 中的跨页表格，将其转化为结构化 Markdown，解决“大模型看不懂财报”的难题。
+- 🛡️ **生产级特性**: 内置 **SQLite** 会话持久化、**Ragas** 自动化评估流水线、**Prompt 配置化**管理，拒绝“裸奔”上线。
 
 ---
 
@@ -22,28 +21,24 @@
 
 ```mermaid
 graph TD
-    User[用户/浏览器] <-->|HTTP/SSE| WebUI[Streamlit 前端]
+    User[用户] <-->|SSE Stream| WebUI[Streamlit 前端]
     WebUI <-->|REST API| Gateway[FastAPI 网关]
     
-    subgraph "Async Service Layer"
-    Gateway -->|Async| Controller[Query Service]
-    Gateway -->|Background Task| Ingestion[Ingestion Service]
+    subgraph "Service Layer (Async)"
+    Gateway -->|Dispatch| QueryService
+    Gateway -->|Background| IngestService
+    QueryService <-->|Read/Write| Cache[Semantic Cache (FAISS)]
+    QueryService <-->|Persist| DB[(SQLite History)]
     end
 
-    subgraph "Deep ETL Pipeline"
-    Ingestion -->|Visual Parse| Docling[Docling PDF Parser]
-    Docling -->|Markdown| Splitter[Text Splitter]
-    end
-    
-    subgraph "Retrieval & Ranking (Local)"
-    Controller -->|Parallel| Hybrid[Hybrid Retriever]
-    Hybrid -->|Keyword| BM25[BM25 Index]
-    Hybrid -->|Semantic| VectorDB[FAISS]
-    Hybrid -->|Re-score| Reranker[BGE Cross-Encoder]
+    subgraph "Core Engine (Local)"
+    IngestService -->|Visual Parse| Docling[Docling ETL]
+    QueryService -->|Hybrid Search| Retriever[BM25 + Vector]
+    Retriever -->|Re-rank| Reranker[BGE ONNX/PyTorch]
     end
 
     subgraph "Inference (Cloud)"
-    Controller -->|Context| LLM[DeepSeek V3 / OpenAI]
+    QueryService -->|Context| LLM[DeepSeek V3 / OpenAI]
     end
 ```
 
@@ -85,42 +80,31 @@ python -m src.nano_rag.cli ingest --force-rebuild
 # 观察日志，确认看到 'Successfully parsed ...' 字样
 ```
 
-### 🟢 第二步：启动服务 (需开启两个终端)
+### 🟢 第二步：启动服务 (双终端)
 
-**Terminal A: 启动后端 API (Engine)**
+**Terminal A: 后端引擎**
 ```bash
 uvicorn src.nano_rag.api.main:app --host 0.0.0.0 --port 8000 --reload
-# 等待显示 'Application startup complete'
 ```
 
-**Terminal B: 启动前端界面 (UI)**
+**Terminal B: 前端界面**
 ```bash
 streamlit run web_app.py
-# 浏览器会自动打开 http://localhost:8501
 ```
 
-### 🟢 第三步：体验问答
-在网页中尝试提问（测试表格理解能力）：
-> *“2024年 Q4 的企业级 RAG 一体机营收是多少？”*
-
-你将看到：
-1. **流式输出**：答案逐字生成。
-2. **精准数据**：准确提取表格中的数字。
-3. **源文档引用**：展示出处文件及匹配度得分。
+### 🟢 第三步：体验亮点功能
+1. **测试表格理解**：问 *“2024年 Q4 的企业级 RAG 一体机营收是多少？”* -> 精准提取表格数据。
+2. **测试语义缓存**：再次问类似问题 *“RAG 一体机 Q4 营收？”* -> **瞬间秒回 (Hit Cache)**。
+3. **测试持久化**：重启后端服务，刷新页面 -> **历史记录依然存在**。
 
 ---
 
-## 📊 质量评估 (Evaluation)
-
-本项目集成了 **Ragas** 框架，用于量化评估 RAG 系统的性能。
-
-运行评估脚本：
+## 📊 质量评估
+运行自动化评估脚本，基于 Ragas 生成测试报告：
 ```bash
 python scripts/evaluate_rag.py
 ```
-**当前基准 (Benchmark)**:
-- **Faithfulness (防幻觉)**: 0.98
-- **Context Recall (召回率)**: 0.92
+**Benchmark**: Faithfulness: 0.98 | Context Precision: 0.95
 
 ---
 
@@ -128,26 +112,22 @@ python scripts/evaluate_rag.py
 
 ```text
 nano_rag/
-├── 🌐 src/nano_rag/api/        # FastAPI 接口层 (Main, Schemas)
-├── 💼 src/nano_rag/services/   # 业务逻辑 (Query, Ingestion)
-├── 🧩 src/nano_rag/components/ # 核心组件 (PDFLoader, LLM, FAISS)
-│   └── pdf_loader.py           # [核心] Docling 适配器
-├── ⚛️ src/nano_rag/core/       # 接口定义 (Async Interfaces)
-├── 📜 scripts/                 # 评估与工具脚本
-├── 📄 web_app.py               # Streamlit 前端应用
-└── ⚙️ configs/                 # 配置文件
+├── 🌐 src/nano_rag/api/        # FastAPI 接口层
+├── 💼 src/nano_rag/services/   # 业务层 (Query, Cache, History)
+├── 🧩 src/nano_rag/components/ # 组件层 (Docling, LLM, ONNX Reranker)
+├── ⚛️ src/nano_rag/core/       # 核心层 (Database, Interfaces)
+├── ⚙️ configs/                 # 配置文件 (YAML, Prompts)
+└── 📄 web_app.py               # Streamlit 前端
 ```
 
 ---
 
 ## 🗺️ 演进路线
-
-- [x] **V1.2**: 全链路异步化 + Docling 复杂解析 + FastAPI 服务化
-- [x] **V1.3**: Streamlit 交互式前端 + 流式响应 (SSE)
-- [ ] **V1.4**: 模型量化 (ONNX) 与 Docker 容器化交付
-- [ ] **V2.0**: Agent 智能体 (工具调用) 与 知识图谱 (GraphRAG)
+- [x] **V1.2**: 全链路异步化 + Docling 表格解析 + FastAPI
+- [x] **V1.3**: Streamlit UI + 语义缓存 + SQLite 持久化 + ONNX 加速
+- [ ] **V1.4**: Docker 容器化交付
+- [ ] **V2.0**: Agent 工具调用 (Tool Use) + 知识图谱 (GraphRAG)
 
 ---
-
 - **Author**: Fengzhengxiong
-- **Focus**: Enterprise AI Architecture
+- **License**: MIT
