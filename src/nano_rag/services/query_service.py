@@ -9,6 +9,7 @@
 '''
 
 import logging
+import asyncio
 from typing import Optional, List, Any, AsyncIterator, Dict
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -18,6 +19,9 @@ from langchain_core.runnables import RunnableSerializable
 from ..core.interfaces import LLMInterface, RetrieverInterface, RerankerInterface
 from ..core.query_models import QueryResponse, SourceDocument
 from .history_service import HistoryService
+from .cache_service import SemanticCacheService
+
+from ..config.prompt_loader import PromptConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +36,15 @@ class QueryService:
             self,
             llm: LLMInterface,
             retriever: RetrieverInterface,
-            reranker: Optional[RerankerInterface] = None
+            prompt_config: PromptConfig,
+            reranker: Optional[RerankerInterface] = None,
+            cache_service: Optional[SemanticCacheService] = None
     ):
         self.llm = llm
         self.retriever = retriever
         self.reranker = reranker
+        self.prompts = prompt_config
+        self.cache_service = cache_service
         self.history_service = HistoryService(max_history_len=5)
 
         # 定义 Chain
@@ -51,23 +59,38 @@ class QueryService:
         llm = self.llm.get_langchain_llm()
         output_parser = StrOutputParser()
 
-        # 1. 改写 Chain
+        # 1. 改写 Chain (使用配置文件中的 prompt)
         condense_prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             "给定以下对话历史和后续问题，请将后续问题改写为一个独立的、包含所有必要上下文的完整问题。\n如果后续问题本身已经是独立的，则保持原样。\n不要回答问题，只负责改写。"),
+            ("system", self.prompts.condense_q_system),  # 【修改】
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{question}")
         ])
         self.condense_q_chain = condense_prompt | llm | output_parser
 
-        # 2. QA Prompt (保存 Prompt 对象以便流式调用时手动构建 Chain)
+        # 2. QA Prompt (使用配置文件中的 prompt)
         self.qa_prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             "你是一个专业的知识库助手。请基于以下提供的【上下文片段】回答用户的问题。\n\n上下文片段:\n{context}\n\n要求：\n1. 如果无法从上下文中得到答案，请明确告知。\n2. 回答要条理清晰，可以使用 Markdown 格式。"),
+            ("system", self.prompts.qa_system),  # 【修改】
             ("human", "{question}")
         ])
-        # 3. QA Chain (供非流式 ask 使用)
         self.qa_chain = self.qa_prompt | llm | output_parser
+
+        # # 1. 改写 Chain
+        # condense_prompt = ChatPromptTemplate.from_messages([
+        #     ("system",
+        #      "给定以下对话历史和后续问题，请将后续问题改写为一个独立的、包含所有必要上下文的完整问题。\n如果后续问题本身已经是独立的，则保持原样。\n不要回答问题，只负责改写。"),
+        #     MessagesPlaceholder(variable_name="chat_history"),
+        #     ("human", "{question}")
+        # ])
+        # self.condense_q_chain = condense_prompt | llm | output_parser
+        #
+        # # 2. QA Prompt (保存 Prompt 对象以便流式调用时手动构建 Chain)
+        # self.qa_prompt = ChatPromptTemplate.from_messages([
+        #     ("system",
+        #      "你是一个专业的知识库助手。请基于以下提供的【上下文片段】回答用户的问题。\n\n上下文片段:\n{context}\n\n要求：\n1. 如果无法从上下文中得到答案，请明确告知。\n2. 回答要条理清晰，可以使用 Markdown 格式。"),
+        #     ("human", "{question}")
+        # ])
+        # # 3. QA Chain (供非流式 ask 使用)
+        # self.qa_chain = self.qa_prompt | llm | output_parser
 
     async def _rewrite_query(self, query: str, history_msgs: List[Any]) -> str:
         """(Async) 使用 LLM 改写问题"""
@@ -150,6 +173,29 @@ class QueryService:
         full_answer = ""  # 用于最后存历史
 
         try:
+            # --- Step 0: 检查缓存 (Cache Look-aside) ---
+            # 注意：只有在没有历史记录（单轮对话）或者明确开启缓存策略时才查缓存
+            # 为了演示效果，我们这里简化逻辑：只要能查到就返回
+            # (严格来说应该先改写 Query 再查缓存，这里为了极致速度先查原 Query)
+
+            cached_answer = None
+            if self.cache_service:
+                cached_answer = await self.cache_service.lookup(query)
+
+            if cached_answer:
+                yield {"type": "status", "content": "⚡️ 命中语义缓存 (0ms)"}
+                # 模拟打字机效果输出缓存内容 (可选，也可以直接一次性返回)
+                # 为了前端兼容性，我们分块推送
+                chunk_size = 5
+                for i in range(0, len(cached_answer), chunk_size):
+                    yield {"type": "token", "content": cached_answer[i:i + chunk_size]}
+                    await asyncio.sleep(0.01)  # 稍微模拟一下流式感
+
+                # 缓存命中也需要存入历史，保持上下文连续
+                await self.history_service.add_turn(session_id, query, cached_answer)
+                return  # 结束
+
+            # --- 以下是正常的 RAG 流程 (未命中缓存) ---
             # --- Step 1: 历史记录 ---
             # yield {"type": "status", "content": "正在读取记忆..."}
             history_msgs = await self.history_service.get_history_messages(session_id)
@@ -183,9 +229,19 @@ class QueryService:
                 yield {"type": "token", "content": token}
 
             # --- Step 5: 存历史 (后台完成) ---
+            # if full_answer:
+            #     await self.history_service.add_turn(session_id, query, full_answer)
+            #     logger.info(f"Stream finished. Answer length: {len(full_answer)}")
+
             if full_answer:
-                await self.history_service.add_turn(session_id, query, full_answer)
-                logger.info(f"Stream finished. Answer length: {len(full_answer)}")
+                # 并行执行：存历史 + 存缓存
+                # 注意：我们缓存的是 "原问题 -> 答案"，而不是 "改写后的问题 -> 答案"
+                # 这样下次用户问同样的话可以直接命中
+                await asyncio.gather(
+                    self.history_service.add_turn(session_id, query, full_answer),
+                    self.cache_service.update(query, full_answer) if self.cache_service else asyncio.sleep(0)
+                )
+                logger.info(f"Stream finished. Cache updated.")
 
         except Exception as e:
             logger.error(f"Error in ask_stream: {e}", exc_info=True)
